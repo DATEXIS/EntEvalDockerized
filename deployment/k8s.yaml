@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: enteval
+  labels:
+    app: enteval
+spec:
+  selector:
+    matchLabels:
+      app: enteval
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: enteval
+    spec:
+      containers:
+        - name: enteval
+          image: registry.datexis.com/tbischoff/enteval:0.0.36
+          volumeMounts:
+           - name: enteval-data
+             mountPath: /data
+           - name: results
+             mountPath: /results
+          env:
+            - name: PATH_TO_DATA
+              value: "/data"
+            - name: PATH_TO_RESULTS
+              value: "/results"
+            - name: ENCODER_URL
+              value: "http://bender-rest-service.tbischoff.svc.cluster.local/embed/sentences"
+          resources:
+            requests:
+              nvidia.com/gpu: 1
+              memory: 16Gi
+              cpu: 8
+            limits:
+              nvidia.com/gpu: 1
+              memory: 128Gi
+              cpu: 32
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: private-registry-auth
+      nodeSelector:
+        gpu: v100
+      volumes:
+        - name: enteval-data
+          persistentVolumeClaim:
+            claimName: enteval-data
+        - name: results
+          persistentVolumeClaim:
+            claimName: results
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: enteval-service
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: enteval
